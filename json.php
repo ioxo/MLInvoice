@@ -128,11 +128,33 @@ case 'add_reminder_fees':
 
 case 'get_invoice_defaults':
   $baseId = getRequest('base_id', 0);
+  $companyId = getRequest('company_id', 0);
   $invoiceId = getRequest('id', 0);
+  $invoiceDate = getRequest('invoice_date', dateConvDBDate2Date(date('Y') . '0101'));
   $intervalType = getRequest('interval_type', 0);
   $invNr = getRequest('invoice_no', 0);
+  $perYear = getSetting('invoice_numbering_per_year');
+
+  // If the invoice already has an invoice number, verify that it's not in use in another invoice
+  if ($invNr) {
+    $query = 'SELECT ID FROM {prefix}invoice where deleted=0 AND id!=? AND invoice_no=?';
+    $params = array($invoiceId, $invNr);
+    if (getSetting('invoice_numbering_per_base') && $baseId)
+    {
+      $query .= ' AND base_id=?';
+      $params[] = $baseId;
+    }
+    if ($perYear) {
+    	$query .= ' AND invoice_date >= ' . dateConvDate2DBDate($invoiceDate);
+    }
+
+    $res = mysqli_param_query($query, $params);
+    if (mysqli_fetch_assoc($res)) {
+      $invNr = 0;
+    }
+  }
+
   if (!$invNr) {
-  	$perYear = getSetting('invoice_numbering_per_year');
   	$maxNr = get_max_invoice_number($invoiceId, getSetting('invoice_numbering_per_base') && $baseId ? $baseId : null, $perYear);
   	if ($maxNr === null && $perYear) {
   		$maxNr = get_max_invoice_number($invoiceId, getSetting('invoice_numbering_per_base') && $baseId ? $baseId : null, false);
@@ -143,7 +165,7 @@ case 'get_invoice_defaults':
     $invNr = 100; // min ref number length is 3 + check digit, make sure invoice number matches that
   $refNr = $invNr . miscCalcCheckNo($invNr);
   $strDate = date($GLOBALS['locDateFormat']);
-  $strDueDate = date($GLOBALS['locDateFormat'], mktime(0, 0, 0, date("m"), date("d")+getSetting('invoice_payment_days'), date("Y")));
+  $strDueDate = date($GLOBALS['locDateFormat'], mktime(0, 0, 0, date("m"), date("d") + getPaymentDays($companyId), date("Y")));
   switch ($intervalType) {
     case 2:
       $nextIntervalDate = date($GLOBALS['locDateFormat'], mktime(0, 0, 0, date("m") + 1, date("d"), date("Y")));
@@ -397,9 +419,11 @@ function printJSONRecords($table, $parentIdCol, $sort)
   $from = "FROM {prefix}$table t";
 
   if ($table == 'invoice_row') {
-    // Include product name and code
+    // Include product name, product code and row type name
     $select .= ", CASE WHEN LENGTH(p.product_code) = 0 THEN IFNULL(p.product_name, '') ELSE CONCAT_WS(' ', p.product_code, IFNULL(p.product_name, '')) END as product_id_text";
     $from .= ' LEFT OUTER JOIN {prefix}product p on (p.id = t.product_id)';
+    $select .= ", rt.name as type_id_text";
+    $from .= ' LEFT OUTER JOIN {prefix}row_type rt on (rt.id = t.type_id)';
   }
 
   $where = '';
@@ -438,6 +462,11 @@ function printJSONRecords($table, $parentIdCol, $sort)
       echo ",\n";
     if ($table == 'users')
       unset($row['password']);
+    if ($table == 'invoice_row') {
+      if (!empty($row['type_id_text']) && isset($GLOBALS['loc' . $row['type_id_text']])) {
+        $row['type_id_text'] = $GLOBALS['loc' . $row['type_id_text']];
+      }
+    }
     echo json_encode($row);
   }
   echo "\n]}";
@@ -504,6 +533,7 @@ function DeleteJSONRecord($table)
 
 function getInvoiceListTotal($where)
 {
+  global $dblink;
   $strFunc = 'invoices';
   $strList = 'invoice';
 
@@ -517,9 +547,12 @@ function getInvoiceListTotal($where)
     $boolean = '';
     while (extractSearchTerm($where, $field, $operator, $term, $nextBool))
     {
-      //echo ("bool: $boolean, field: $field, op: $operator, term: $term \n");
-      $strWhereClause .= "$boolean$field $operator ?";
-      $arrQueryParams[] = str_replace("%-", "%", $term);
+      if (strcasecmp($operator, 'IN') === 0) {
+        $strWhereClause .= "$boolean$field $operator " . mysqli_real_escape_string($dblink, $term);
+      } else {
+        $strWhereClause .= "$boolean$field $operator ?";
+        $arrQueryParams[] = str_replace("%-", "%", $term);
+      }
       if (!$nextBool)
         break;
       $boolean = " $nextBool";

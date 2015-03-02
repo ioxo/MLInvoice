@@ -181,6 +181,34 @@ function updateProductStockBalance($invoiceRowId, $productId, $count)
 	}
 }
 
+function getTermsOfPayment($companyId)
+{
+  if (!empty($companyId)) {
+    $res = mysqli_param_query('SELECT terms_of_payment FROM {prefix}company WHERE id = ?',
+      array($companyId)
+    );
+    $companyPaymentTerms = mysqli_fetch_value($res);
+    if (!empty($companyPaymentTerms)) {
+      return $companyPaymentTerms;
+    }
+  }
+  return getSetting('invoice_terms_of_payment');
+}
+
+function getPaymentDays($companyId)
+{
+  if (!empty($companyId)) {
+    $res = mysqli_param_query('SELECT payment_days FROM {prefix}company WHERE id = ?',
+      array($companyId)
+    );
+    $companyPaymentDays = mysqli_fetch_value($res);
+    if (!empty($companyPaymentDays)) {
+      return $companyPaymentDays;
+    }
+  }
+  return getSetting('invoice_payment_days');
+}
+
 function deleteRecord($table, $id)
 {
   mysqli_query_check('BEGIN');
@@ -266,9 +294,7 @@ function mysqli_param_query($query, $params=false, $noFail=false)
           $t .= ',';
         $v2 = mysqli_real_escape_string($dblink, $v2);
         if (!is_numeric($v2) || (strlen(trim($v2)) > 0 && substr(trim($v2), 0, 1) == '0')) {
-          if (substr(trim($v2), 0, 1 != '(')) {
-            $v2 = "'$v2'";
-          }
+          $v2 = "'$v2'";
         }
         $t .= $v2;
       }
@@ -278,9 +304,7 @@ function mysqli_param_query($query, $params=false, $noFail=false)
     {
       $v = mysqli_real_escape_string($dblink, $v);
       if (!is_numeric($v) || (strlen(trim($v)) > 1 && substr(trim($v), 0, 1) == '0')) {
-        if (substr(trim($v), 0, 1) != '(') {
-          $v = "'$v'";
-        }
+        $v = "'$v'";
       }
     }
   }
@@ -685,25 +709,29 @@ EOT
     ));
   }
 
+  if ($version < 37) {
+    $updates = array_merge($updates, array(
+      'ALTER TABLE {prefix}company ADD COLUMN payment_days int(11) default NULL',
+      'ALTER TABLE {prefix}company ADD COLUMN terms_of_payment varchar(255) NULL',
+      "REPLACE INTO {prefix}state (id, data) VALUES ('version', '37')"
+    ));
+  }
+
   if (!empty($updates)) {
+    mysqli_query_check('BEGIN');
     foreach ($updates as $update) {
       $res = mysqli_query_check($update, true);
       if ($res === false) {
-        error_log('Database upgrade query failed. Please execute the following queries manually: ');
-        $ok = true;
-        foreach ($updates as $update2) {
-          if ($update === $update2) {
-            $ok = false;
-          }
-          if ($ok) {
-            continue;
-          }
-          $update2 = str_replace('{prefix}', _DB_PREFIX_ . '_', $update2);
-          error_log($update2);
-        }
+        mysqli_query_check('ROLLBACK');
+        error_log("Database upgrade query failed. Please execute the following queries manually:"
+            . PHP_EOL . PHP_EOL
+            . implode(PHP_EOL, array_map(function($s) { return str_replace('{prefix}', _DB_PREFIX_ . '_', $s); }, $updates))
+            . PHP_EOL
+        );
         return 'FAILED';
       }
     }
+    mysqli_query_check('COMMIT');
     return 'UPGRADED';
   }
   return 'OK';

@@ -77,6 +77,10 @@ case 'company':
     array(
       'name' => 'delivery_method_id', 'label' => $GLOBALS['locDeliveryMethod'], 'type' => 'LIST', 'style' => 'medium', 'listquery' => 'SELECT id, name FROM {prefix}delivery_method WHERE deleted=0 ORDER BY order_no;', 'position' => 2, 'default' => null, 'allow_null' => true ),
     array(
+      'name' => 'payment_days', 'label' => $GLOBALS['locPaymentDays'], 'type' => 'INT', 'style' => 'short', 'position' => 1, 'default' => null, 'allow_null' => true ),
+    array(
+      'name' => 'terms_of_payment', 'label' => $GLOBALS['locTermsOfPayment'], 'type' => 'TEXT', 'style' => 'medium', 'position' => 2, 'default' => null, 'allow_null' => true ),
+    array(
       'name' => 'street_address', 'label' => $GLOBALS['locStreetAddr'], 'type' => 'TEXT', 'style' => 'medium', 'position' => 1, 'allow_null' => true ),
     array(
       'name' => 'zip_code', 'label' => $GLOBALS['locZipCode'], 'type' => 'TEXT', 'style' => 'short', 'position' => 2, 'allow_null' => true ),
@@ -249,28 +253,35 @@ case 'invoice':
   if (sesWriteAccess())
   {
     $companyOnChange = <<<EOS
-onchange = "$.getJSON('json.php?func=get_company', {id: $('#company_id').val() }, function(json) {
-  if (json) {
-    if (json.default_ref_number) {
-      $('#ref_number').val(json.default_ref_number);
-    }
-    if (json.delivery_terms_id) {
-      $('#delivery_terms_id').val(json.delivery_terms_id);
-    }
-    if (json.delivery_method_id) {
-      $('#delivery_method_id').val(json.delivery_method_id);
-    }
+  function() {
+    $.getJSON('json.php?func=get_company', {id: $('#company_id').val() }, function(json) {
+      if (json) {
+        if (json.default_ref_number) {
+          $('#ref_number').val(json.default_ref_number);
+        }
+        if (json.delivery_terms_id) {
+          $('#delivery_terms_id').val(json.delivery_terms_id);
+        }
+        if (json.delivery_method_id) {
+          $('#delivery_method_id').val(json.delivery_method_id);
+        }
+        if (json.payment_days) {
+          $.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), invoice_date: $('#invoice_date').val(), base_id: $('#base_id').val(), company_id: $('#company_id').val(), interval_type: $('#interval_type').val()}, function(json) {
+            $('#due_date').val(json.due_date);
+          });
+        }
+      }
+    });
   }
-});"
 EOS;
 
     $getInvoiceNr = <<<EOS
-$.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), base_id: $('#base_id').val(), interval_type: $('#interval_type').val()}, function(json) { $('#invoice_no').val(json.invoice_no); $('#ref_number').val(json.ref_no); $('.save_button').addClass('ui-state-highlight'); }); return false;
+$.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), invoice_date: $('#invoice_date').val(), base_id: $('#base_id').val(), company_id: $('#company_id').val(), interval_type: $('#interval_type').val()}, function(json) { $('#invoice_no').val(json.invoice_no); $('#ref_number').val(json.ref_no); $('.save_button').addClass('ui-state-highlight'); }); return false;
 EOS;
 
     $locUpdateDates = $GLOBALS['locUpdateDates'];
     $updateDates = <<<EOS
-<a class="formbuttonlink" href="#" onclick="$.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), base_id: $('#base_id').val(), interval_type: $('#interval_type').val()}, function(json) { $('#invoice_date').val(json.date); $('#due_date').val(json.due_date); $('#next_interval_date').val(json.next_interval_date); $('.save_button').addClass('ui-state-highlight'); }); return false;">$locUpdateDates</a>
+<a class="formbuttonlink" href="#" onclick="$.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), invoice_date: $('#invoice_date').val(), base_id: $('#base_id').val(), company_id: $('#company_id').val(), interval_type: $('#interval_type').val()}, function(json) { $('#invoice_date').val(json.date); $('#due_date').val(json.due_date); $('#next_interval_date').val(json.next_interval_date); $('.save_button').addClass('ui-state-highlight'); }); return false;">$locUpdateDates</a>
 EOS;
 
     $locNew = $GLOBALS['locNew'] . '...';
@@ -311,7 +322,7 @@ EOS;
 
     if (getSetting('invoice_add_number') || getSetting('invoice_add_reference_number'))
     {
-      $invoiceNumberUpdatePrefix = "$.getJSON('json.php?func=get_invoice_defaults&amp;id=' + document.getElementById('record_id').value + '&amp;base_id=' + document.getElementById('base_id').value + '&amp;invoice_no=' + document.getElementById('invoice_no').value, function(json) { ";
+      $invoiceNumberUpdatePrefix = "$.getJSON('json.php?func=get_invoice_defaults', {id: $('#record_id').val(), invoice_no: $('#invoice_no').val(), invoice_date: $('#invoice_date').val(), base_id: $('#base_id').val(), company_id: $('#company_id').val(), interval_type: $('#interval_type').val()}, function(json) { ";
       if (getSetting('invoice_add_number'))
         $invoiceNumberUpdatePrefix .= "var invoice_no = document.getElementById('invoice_no'); if (invoice_no.value == '' || invoice_no.value < 100) invoice_no.value = json.invoice_no; ";
       if (getSetting('invoice_add_reference_number'))
@@ -322,6 +333,27 @@ EOS;
     if (!getSetting('invoice_add_number')) {
       $invoiceNumberUpdatePrefix .= "invoice_no = document.getElementById('invoice_no'); if (invoice_no.value == '' || invoice_no.value == 0) { if (!confirm('" . $GLOBALS['locInvoiceNumberNotDefined'] . "')) return false; }";
     }
+  }
+
+  $today = dateConvDBDate2Date(date('Ymd'));
+  $markPaidToday = <<<EOS
+$('#state_id').val(3); if (!$(this).is('#payment_date')) { $('#payment_date').val('$today'); }
+EOS;
+  if (getSetting('invoice_auto_archive')) {
+    $markPaidToday .= <<<EOS
+$('#archived').prop('checked', true);
+EOS;
+  }
+  $markPaidToday .= <<<EOS
+$('.save_button').addClass('ui-state-highlight'); return false;
+EOS;
+  $markPaidTodayButton = '<a class="formbuttonlink" href="#" onclick="' . $markPaidToday .'">' . $GLOBALS['locMarkAsPaidToday'] . '</a>';
+  if (getSetting('invoice_mark_paid_when_payment_date_set')) {
+    $markPaidTodayEvent = <<<EOF
+if ($(this).val()) { $markPaidToday }
+EOF;
+  } else {
+    $markPaidTodayEvent = '';
   }
 
   // Print buttons
@@ -415,7 +447,7 @@ EOS;
     array(
       'name' => 'state_id', 'label' => $GLOBALS['locStatus'], 'type' => 'LIST', 'style' => 'medium translated', 'listquery' => 'SELECT id, name FROM {prefix}invoice_state WHERE deleted=0 ORDER BY order_no', 'position' => 1, 'default' => 1 ),
     array(
-      'name' => 'payment_date', 'label' => $GLOBALS['locPayDate'], 'type' => 'INTDATE', 'style' => 'date', 'position' => 2, 'allow_null' => true ),
+      'name' => 'payment_date', 'label' => $GLOBALS['locPayDate'], 'type' => 'INTDATE', 'style' => 'date', 'position' => 2, 'allow_null' => true, 'attached_elem' => $markPaidTodayButton, 'elem_attributes' => 'onchange="' . $markPaidTodayEvent . '"' ),
     array(
       'name' => 'delivery_terms_id', 'label' => $GLOBALS['locDeliveryTerms'], 'type' => 'LIST', 'style' => 'medium', 'listquery' => 'SELECT id, name FROM {prefix}delivery_terms WHERE deleted=0 ORDER BY order_no;', 'position' => 1, 'default' => null, 'allow_null' => true ),
     array(
@@ -491,29 +523,32 @@ EOS;
   }
 
    $productOnChange = <<<EOS
-onchange = "var form_id = this.form.id; $.getJSON('json.php?func=get_product&amp;id=' + this.value, function(json) {
-  globals.selectedProduct = json;
-  if (!json || !json.id) return;
+  function() {
+    var form_id = this.form.id;
+    $.getJSON('json.php?func=get_product&id=' + this.value, function(json) {
+      globals.selectedProduct = json;
+      if (!json || !json.id) return;
 
-  if (json.description != '' || document.getElementById(form_id + '_description').value == (globals.defaultDescription != null ? globals.defaultDescription : ''))
-    document.getElementById(form_id + '_description').value = json.description;
-  globals.defaultDescription = json.description;
+      if (json.description != '' || document.getElementById(form_id + '_description').value == (globals.defaultDescription != null ? globals.defaultDescription : ''))
+        document.getElementById(form_id + '_description').value = json.description;
+      globals.defaultDescription = json.description;
 
-  var type_id = document.getElementById(form_id + '_type_id');
-  for (var i = 0; i < type_id.options.length; i++)
-  {
-    var item = type_id.options[i];
-    if (item.value == json.type_id)
-    {
-      item.selected = true;
-      break;
-    }
+      var type_id = document.getElementById(form_id + '_type_id');
+      for (var i = 0; i < type_id.options.length; i++)
+      {
+        var item = type_id.options[i];
+        if (item.value == json.type_id)
+        {
+          item.selected = true;
+          break;
+        }
+      }
+      document.getElementById(form_id + '_price').value = json.unit_price ? json.unit_price.replace('.', ',') : '';
+      document.getElementById(form_id + '_discount').value = json.discount ? json.discount.replace('.', ',') : '';
+      document.getElementById(form_id + '_vat').value = json.vat_percent ? json.vat_percent.replace('.', ',') : '';
+      document.getElementById(form_id + '_vat_included').checked = (json.vat_included && json.vat_included == 1) ? true : false;
+    });
   }
-  document.getElementById(form_id + '_price').value = json.unit_price ? json.unit_price.replace('.', ',') : '';
-  document.getElementById(form_id + '_discount').value = json.discount ? json.discount.replace('.', ',') : '';
-  document.getElementById(form_id + '_vat').value = json.vat_percent ? json.vat_percent.replace('.', ',') : '';
-  document.getElementById(form_id + '_vat_included').checked = (json.vat_included && json.vat_included == 1) ? true : false;
-});"
 EOS;
 
    $multiplierColumn = 'pcs';
@@ -630,7 +665,7 @@ EOF;
     array(
       'name' => 'invoice_email_bcc', 'label' => $GLOBALS['locBaseEmailBCC'], 'type' => 'TEXT', 'style' => 'medium', 'position' => 2, 'allow_null' => true ),
     array(
-      'name' => 'invoice_email_subject', 'label' => $GLOBALS['locBaseReceiptEmailSubject'], 'type' => 'TEXT', 'style' => 'long', 'position' => 0, 'allow_null' => true ),
+      'name' => 'invoice_email_subject', 'label' => $GLOBALS['locBaseInvoiceEmailSubject'], 'type' => 'TEXT', 'style' => 'long', 'position' => 0, 'allow_null' => true ),
     array(
       'name' => 'invoice_email_body', 'label' => $GLOBALS['locBaseInvoiceEmailBody'], 'type' => 'AREA', 'style' => 'email email_body', 'position' => 0, 'allow_null' => true ),
     array(

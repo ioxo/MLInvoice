@@ -31,6 +31,7 @@ $arrSettings = array(
   ),
   'check_updates' => array('label' => $GLOBALS['locSettingCheckForUpdates'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 0, 'allow_null' => TRUE ),
   'address_autocomplete' => array('label' => $GLOBALS['locSettingAddressAutocomplete'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 0, 'allow_null' => TRUE ),
+  'dynamic_select_search_in_middle' => array('label' => $GLOBALS['locSettingSearchInMiddleOfFields'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 0, 'allow_null' => TRUE ),
 
   'invoice_sep' => array('label' => $GLOBALS['locSettingInvoices'], 'type' => 'LABEL'),
 
@@ -47,6 +48,7 @@ $arrSettings = array(
   'invoice_warn_if_noncurrent_date' => array('label' => $GLOBALS['locSettingInvoiceWarnIfNonCurrentDate'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 1, 'allow_null' => TRUE ),
   'invoice_send_reminder_to_invoicing_address' => array('label' => $GLOBALS['locSettingInvoiceSendReminderToInvoicingAddress'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 0, 'allow_null' => TRUE ),
   'invoice_display_vatless_price_in_list' => array('label' => $GLOBALS['locSettingInvoiceDisplayVATLessPriceInList'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 0, 'allow_null' => TRUE ),
+  'invoice_mark_paid_when_payment_date_set' => array('label' => $GLOBALS['locSettingInvoiceMarkPaidWhenPaymentDateIsSet'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 1, 'allow_null' => TRUE ),
   'invoice_auto_archive' => array('label' => $GLOBALS['locSettingInvoiceAutoArchive'], 'type' => 'CHECK', 'style' => 'medium', 'position' => 1, 'default' => 1, 'allow_null' => TRUE ),
 
 	'invoice_default_vat_percent' => array('label' => $GLOBALS['locSettingInvoiceDefaultVATPercent'], 'type' => 'PERCENT', 'style' => 'percent', 'position' => 1, 'default' => 24, 'allow_null' => FALSE ),

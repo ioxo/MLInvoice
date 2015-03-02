@@ -75,8 +75,8 @@ $xUACompatible  <title>$strTitle</title>
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="stylesheet" type="text/css" href="$theme">
   <link rel="stylesheet" type="text/css" href="jquery/css/ui.daterangepicker.css">
+  <link href="select2/select2.css" rel="stylesheet" />
   <link rel="stylesheet" type="text/css" href="css/style.css">
-	<link href="select2/select2.css" rel="stylesheet" />
   <script type="text/javascript" src="jquery/js/jquery-1.10.2.min.js"></script>
   <script type="text/javascript" src="jquery/js/jquery.json-2.3.min.js"></script>
   <script type="text/javascript" src="jquery/js/jquery.cookie.js"></script>
@@ -90,7 +90,6 @@ $xUACompatible  <title>$strTitle</title>
   <script type="text/javascript" src="select2/select2.min.js"></script>$select2locale
   <script type="text/javascript">
 $(document).ready(function() {
-	$("select#company_id,select#iform_product_id").select2({ width:"element" });
   $.datepicker.setDefaults($datePickerOptions);
   $('a[class~="actionlink"]').button();
   $('a[class~="tinyactionlink"]').button();
@@ -313,8 +312,9 @@ EOT;
           $showEmpty = '';
         }
         $strValue = htmlspecialchars($strValue);
+        $onchange = $astrAdditionalAttributes ? ".on(\"change\", $astrAdditionalAttributes)" : '';
         $strFormElement = <<<EOT
-<input type="hidden" class="$strStyle" id="$strName" name="$strName" value="$strValue"$astrAdditionalAttributes/>
+<input type="hidden" class="$strStyle" id="$strName" name="$strName" value="$strValue"/>
 <script type="text/javascript">
 $(document).ready(function() {
   $("#$strName").select2({
@@ -346,8 +346,9 @@ $(document).ready(function() {
     },
     dropdownCssClass: "bigdrop",
     dropdownAutoWidth: true,
-    escapeMarkup: function (m) { return m; }
-  }).val($strValue);
+    escapeMarkup: function (m) { return m; },
+    width: "element"
+  })$onchange
 });
 </script>
 EOT;

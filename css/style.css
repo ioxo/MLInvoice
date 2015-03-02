@@ -474,6 +474,19 @@ img.image {
 	margin-bottom: 1em;
 }
 
-.select2-results {
-	font-size: 120%;
+.select2-search input, .select2-results {
+	font-size: 1.2em;
+	font-family: Verdana,Arial,sans-serif;
+}
+
+#column_table tr:nth-child(even) {
+  background: rgb(0, 0, 0) transparent;
+  background: rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+#column_table tr:nth-child(odd) {
+  background: rgb(0, 0, 0) transparent;
+  background: rgba(0, 0, 0, 0.0);
+  cursor: pointer;
 }

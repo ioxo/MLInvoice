@@ -161,9 +161,9 @@ abstract class InvoicePrinterBase
 
     $this->recipientFullAddress = $recipientData['company_name'] . "\n" . $recipientData['street_address'] . "\n" . $recipientData['zip_code'] . ' ' . $recipientData['city'];
     $this->billingAddress = $recipientData['billing_address'];
-    if (!$this->billingAddress ||
-      (($invoiceData['state_id'] == 5 || $invoiceData['state_id'] == 6)
-       && !getSetting('invoice_send_reminder_to_invoicing_address'))
+    if (!$this->billingAddress || $this->printStyle != 'invoice'
+      || (($invoiceData['state_id'] == 5 || $invoiceData['state_id'] == 6)
+      && !getSetting('invoice_send_reminder_to_invoicing_address'))
     ) {
       $this->billingAddress = $this->recipientFullAddress;
     }
@@ -381,9 +381,11 @@ abstract class InvoicePrinterBase
       $pdf->SetX(115);
       $pdf->Cell(40, 5, $GLOBALS['locPDFTermsOfPayment'] . ': ', 0, 0, 'R');
       $paymentDays = round(dbDate2UnixTime($invoiceData['due_date']) / 3600 / 24 - dbDate2UnixTime($invoiceData['invoice_date']) / 3600 / 24);
-      if ($paymentDays < 0) //weird
-        $paymentDays = getSetting('invoice_payment_days');
-      $pdf->Cell(60, 5, sprintf(getSetting('invoice_terms_of_payment'), $paymentDays), 0, 1);
+      if ($paymentDays < 0) {
+        // This shouldn't happen, but try to be safe...
+        $paymentDays = getPaymentDate($invoiceData['company_id']);
+      }
+      $pdf->Cell(60, 5, sprintf(getTermsOfPayment($invoiceData['company_id']), $paymentDays), 0, 1);
       $pdf->SetX(115);
       $pdf->Cell(40, 5, $GLOBALS['locPDFPeriodForComplaints'] . ': ', 0, 0, 'R');
       $pdf->Cell(60, 5, getSetting('invoice_period_for_complaints'), 0, 1);
@@ -398,7 +400,7 @@ abstract class InvoicePrinterBase
       }
     }
 
-    if ($invoiceData['reference'] && $this->printStyle != 'dispatch')
+    if ($invoiceData['reference'])
     {
       $pdf->SetX(115);
       $pdf->Cell(40, 5, $GLOBALS['locPDFYourReference'] . ': ', 0, 0, 'R');
