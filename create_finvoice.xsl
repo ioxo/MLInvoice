@@ -75,6 +75,9 @@
   <BuyerPartyDetails>
     <BuyerPartyIdentifier><xsl:value-of select="company_id"/></BuyerPartyIdentifier>
     <BuyerOrganisationName><xsl:value-of select="company_name"/></BuyerOrganisationName>
+    <xsl:if test="vat_id!=''">
+      <BuyerOrganisationTaxCode><xsl:value-of select="vat_id"/></BuyerOrganisationTaxCode>
+    </xsl:if>
     <xsl:if test="street_address!='' and zip_code!='' and city !=''">
     <BuyerPostalAddressDetails>
       <BuyerStreetName><xsl:value-of select="street_address"/></BuyerStreetName>
@@ -152,8 +155,11 @@
   </InvoiceDetails>
   <PaymentStatusDetails>
     <xsl:choose>
-     <xsl:when test="totalsum &lt; 0">
+     <xsl:when test="totalsumvat - paidsum = 0">
     <PaymentStatusCode>PAID</PaymentStatusCode>
+     </xsl:when>
+     <xsl:when test="paidsum &gt; 0">
+    <PaymentStatusCode>PARTLYPAID</PaymentStatusCode>
      </xsl:when>
      <xsl:otherwise>
     <PaymentStatusCode>NOTPAID</PaymentStatusCode>
@@ -180,6 +186,11 @@
     <ArticleName>--</ArticleName>
       </xsl:otherwise>
     </xsl:choose>
+    <xsl:choose>
+      <xsl:when test="partial_payment=1">
+    <RowAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(price, '0,00###', 'euro')"/></RowAmount>
+      </xsl:when>
+      <xsl:otherwise>
     <DeliveredQuantity QuantityUnitCode="{@type}"><xsl:value-of select="format-number(pcs, '0,00', 'euro')"/></DeliveredQuantity>
     <UnitPriceAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(price, '0,00###', 'euro')"/></UnitPriceAmount>
     <RowDeliveryDate Format="CCYYMMDD"><xsl:value-of select="row_date"/></RowDeliveryDate>
@@ -188,6 +199,8 @@
     <RowVatAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(rowvat, '0,00###', 'euro')"/></RowVatAmount>
     <RowVatExcludedAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(rowsum, '0,00###', 'euro')"/></RowVatExcludedAmount>
     <RowAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(rowsumvat, '0,00###', 'euro')"/></RowAmount>
+      </xsl:otherwise>
+    </xsl:choose>
   </InvoiceRow>
   </xsl:for-each>
   <EpiDetails>
@@ -215,7 +228,7 @@
       <EpiRemittanceInfoIdentifier IdentificationSchemeName="SPY"><xsl:value-of select="format-number(ref_number, '00000000000000000000')"/></EpiRemittanceInfoIdentifier>
     </xsl:otherwise>
   </xsl:choose>    
-      <EpiInstructedAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(totalsumvat, '0,00', 'euro')"/></EpiInstructedAmount>
+      <EpiInstructedAmount AmountCurrencyIdentifier="EUR"><xsl:value-of select="format-number(totalsumvat - paidsum, '0,00', 'euro')"/></EpiInstructedAmount>
       <EpiCharge ChargeOption="SHA">SHA</EpiCharge>
       <EpiDateOptionDate Format="CCYYMMDD"><xsl:value-of select="due_date"/></EpiDateOptionDate>
     </EpiPaymentInstructionDetails>
